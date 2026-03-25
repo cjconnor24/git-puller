@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,11 +12,28 @@ import (
 )
 
 func main() {
-	// Get current working directory
-	currentDir, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("Error getting current directory: %v\n", err)
-		os.Exit(1)
+	// Define command line flags
+	baseDir := flag.String("basedir", "", "Base directory to search for Git repositories (defaults to current directory)")
+	flag.Parse()
+
+	// Determine the directory to use
+	var currentDir string
+	var err error
+
+	if *baseDir != "" {
+		// Validate that the provided basedir exists
+		if _, err := os.Stat(*baseDir); err != nil {
+			fmt.Printf("Error: basedir path does not exist: %s\n", *baseDir)
+			os.Exit(1)
+		}
+		currentDir = *baseDir
+	} else {
+		// Get current working directory
+		currentDir, err = os.Getwd()
+		if err != nil {
+			fmt.Printf("Error getting current directory: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	fmt.Printf("Searching for Git repositories in: %s\n", currentDir)
@@ -94,7 +112,7 @@ func findGitRepos(baseDir string) ([]string, error) {
 
 			// Check if .git exists (either as directory or file for worktrees)
 			if _, err := os.Stat(gitPath); err == nil {
-				gitRepos = append(gitRepos, entry.Name())
+				gitRepos = append(gitRepos, dirPath)
 			}
 		}
 	}
