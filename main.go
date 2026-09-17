@@ -14,6 +14,7 @@ import (
 func main() {
 	// Define command line flags
 	baseDir := flag.String("basedir", "", "Base directory to search for Git repositories (defaults to current directory)")
+	operation := flag.String("operation", "pull", "Git operation to perform: pull, fetch, or fetch-prune")
 	flag.Parse()
 
 	// Determine the directory to use
@@ -55,7 +56,7 @@ func main() {
 		fmt.Printf("  - %s\n", repo)
 	}
 
-	fmt.Println("\nUpdating repositories...")
+	fmt.Printf("\nPerforming %q on repositories...\n", *operation)
 
 	// Create a channel for repos and a WaitGroup for synchronization
 	repoChan := make(chan string, len(gitRepos))
@@ -69,7 +70,7 @@ func main() {
 	// Start worker goroutines
 	for i := 1; i <= numWorkers; i++ {
 		wg.Add(1)
-		go worker(i, repoChan, &wg, &mu, &activeCount, &errorRepos)
+		go worker(i, repoChan, &wg, &mu, &activeCount, &errorRepos, *operation)
 	}
 
 	// Send repos to the channel
@@ -120,21 +121,30 @@ func findGitRepos(baseDir string) ([]string, error) {
 	return gitRepos, nil
 }
 
-// updateRepo runs git pull in the specified repository
-func updateRepo(repoName string, mu *sync.Mutex, activeCount *int, errorRepos *[]string) {
+// updateRepo runs the git operation in the specified repository
+func updateRepo(repoName string, mu *sync.Mutex, activeCount *int, errorRepos *[]string, operation string) {
 	mu.Lock()
 	*activeCount++
 	currentActive := *activeCount
 	mu.Unlock()
 
-	fmt.Printf("[%d active] --- Updating %s ---\n", currentActive, repoName)
+	fmt.Printf("[%d active] --- %s %s ---\n", currentActive, strings.Title(operation), repoName)
 
-	cmd := exec.Command("git", "-C", repoName, "pull")
+	var cmd *exec.Cmd
+	switch operation {
+	case "fetch":
+		cmd = exec.Command("git", "-C", repoName, "fetch")
+	case "fetch-prune":
+		cmd = exec.Command("git", "-C", repoName, "fetch", "--prune")
+	default:
+		cmd = exec.Command("git", "-C", repoName, "pull")
+	}
+
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
 		mu.Lock()
-		fmt.Printf("❌ Error updating %s: %v\n", repoName, err)
+		fmt.Printf("❌ Error %s %s: %v\n", operation, repoName, err)
 		if len(output) > 0 {
 			fmt.Printf("Output: %s\n", strings.TrimSpace(string(output)))
 		}
@@ -143,7 +153,7 @@ func updateRepo(repoName string, mu *sync.Mutex, activeCount *int, errorRepos *[
 		mu.Unlock()
 	} else {
 		mu.Lock()
-		fmt.Printf("✅ Successfully updated %s\n", repoName)
+		fmt.Printf("✅ Successfully %s %s\n", operation, repoName)
 		if len(output) > 0 {
 			fmt.Printf("Output: %s\n", strings.TrimSpace(string(output)))
 		}
@@ -153,10 +163,10 @@ func updateRepo(repoName string, mu *sync.Mutex, activeCount *int, errorRepos *[
 }
 
 // worker processes repos from the channel
-func worker(id int, repos <-chan string, wg *sync.WaitGroup, mu *sync.Mutex, activeCount *int, errorRepos *[]string) {
+func worker(id int, repos <-chan string, wg *sync.WaitGroup, mu *sync.Mutex, activeCount *int, errorRepos *[]string, operation string) {
 	defer wg.Done()
 
 	for repo := range repos {
-		updateRepo(repo, mu, activeCount, errorRepos)
+		updateRepo(repo, mu, activeCount, errorRepos, operation)
 	}
 }
