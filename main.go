@@ -63,7 +63,7 @@ func main() {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var errorRepos []string
-	numWorkers := 14
+	numWorkers := 32
 	activeCount := 0
 	startTime := time.Now()
 
