@@ -52,9 +52,9 @@ func main() {
 	}
 
 	fmt.Printf("Found %d Git repositories:\n", len(gitRepos))
-	for _, repo := range gitRepos {
-		fmt.Printf("  - %s\n", repo)
-	}
+	// for _, repo := range gitRepos {
+	// 	fmt.Printf("  - %s\n", repo)
+	// }
 
 	fmt.Printf("\nPerforming %q on repositories...\n", *operation)
 
